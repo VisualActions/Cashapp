@@ -1,4 +1,4 @@
-name: Xcode Build
+name: Xcode Unsigned IPA Build
 
 on:
   push:
@@ -19,37 +19,47 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
-      # Step 3: Convert the private local scheme into a shared scheme
       - name: Make Schemes Shared
         run: |
           PROJECT_DIR="CashappSpoof.xcodeproj"
           USERDATA_DIR="$PROJECT_DIR/xcuserdata"
           SHARED_DIR="$PROJECT_DIR/xcshareddata/xcschemes"
-
           mkdir -p "$SHARED_DIR"
-
           if [ -d "$USERDATA_DIR" ]; then
             find "$USERDATA_DIR" -name "*.xcscheme" -exec cp {} "$SHARED_DIR/" \;
-            echo "Successfully converted private schemes to shared schemes!"
-            ls -la "$SHARED_DIR"
-          else
-            echo "Warning: No xcuserdata folder found to convert."
           fi
 
-      # Step 4: Dynamically locate available simulator and build
-      - name: Select Simulator and Build
+      # Step 4: Generate a native iOS Archive without checking for signing certificates
+      - name: Archive Project (No Code Signing)
         run: |
-          # Check if iPhone 15 exists; if not, parse and pick the first available iPhone model
-          if xcrun simctl list devices available | grep -q "iPhone 15"; then
-            DEST='platform=iOS Simulator,name=iPhone 15,OS=latest'
-          else
-            NAME=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/ *([^()]+) .*/\1/; s/^[ \t]*//; s/[ \t]*$//')
-            DEST="platform=iOS Simulator,name=${NAME},OS=latest"
-          fi
-          
-          echo "Using simulator destination: $DEST"
-          
-          xcodebuild clean build \
+          xcodebuild archive \
             -project "CashappSpoof.xcodeproj" \
             -scheme "CashappSpoof" \
-            -destination "$DEST"
+            -archivePath build/CashappSpoof.xcarchive \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      # Step 5: Convert the .xcarchive into a standard Unsigned .ipa wrapper
+      - name: Package Unsigned IPA
+        run: |
+          # 1. Create the Payload directory structure that iOS packages require
+          mkdir -p build/Payload
+          
+          # 2. Extract and copy the compiled .app directory into the Payload folder
+          cp -r build/CashappSpoof.xcarchive/Products/Applications/*.app build/Payload/
+          
+          # 3. Zip the Payload folder up into an .ipa extension file
+          cd build
+          zip -r CashappSpoof-Unsigned.ipa Payload
+          
+          echo "✅ Unsigned IPA created successfully!"
+          ls -la
+
+      # Step 6: Upload the final packaged file to GitHub Actions for download
+      - name: Upload Unsigned IPA Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: CashappSpoof-Unsigned-App
+          path: build/CashappSpoof-Unsigned.ipa
