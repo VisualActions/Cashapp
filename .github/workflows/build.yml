@@ -26,10 +26,8 @@ jobs:
           USERDATA_DIR="$PROJECT_DIR/xcuserdata"
           SHARED_DIR="$PROJECT_DIR/xcshareddata/xcschemes"
 
-          # Create the destination directory if it doesn't exist
           mkdir -p "$SHARED_DIR"
 
-          # Find any .xcscheme files inside the private xcuserdata folder and copy them over
           if [ -d "$USERDATA_DIR" ]; then
             find "$USERDATA_DIR" -name "*.xcscheme" -exec cp {} "$SHARED_DIR/" \;
             echo "Successfully converted private schemes to shared schemes!"
@@ -38,10 +36,20 @@ jobs:
             echo "Warning: No xcuserdata folder found to convert."
           fi
 
-      # Step 4: Run the build with the newly shared scheme
-      - name: Build Project
+      # Step 4: Dynamically locate available simulator and build
+      - name: Select Simulator and Build
         run: |
+          # Check if iPhone 15 exists; if not, parse and pick the first available iPhone model
+          if xcrun simctl list devices available | grep -q "iPhone 15"; then
+            DEST='platform=iOS Simulator,name=iPhone 15,OS=latest'
+          else
+            NAME=$(xcrun simctl list devices available | grep -m1 "iPhone" | sed -E 's/ *([^()]+) .*/\1/; s/^[ \t]*//; s/[ \t]*$//')
+            DEST="platform=iOS Simulator,name=${NAME},OS=latest"
+          fi
+          
+          echo "Using simulator destination: $DEST"
+          
           xcodebuild clean build \
             -project "CashappSpoof.xcodeproj" \
             -scheme "CashappSpoof" \
-            -destination 'platform=iOS Simulator,name=iPhone 15'
+            -destination "$DEST"
