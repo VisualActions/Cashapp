@@ -11,22 +11,37 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # Step 1: Download your repository files onto the GitHub runner
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Step 2: Set up the latest stable version of Xcode tools
       - name: Set Xcode Version
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: 'latest-stable'
 
-      # Step 3: Automatically generate schemes and compile the app
+      # Step 3: Convert the private local scheme into a shared scheme
+      - name: Make Schemes Shared
+        run: |
+          PROJECT_DIR="CashappSpoof.xcodeproj"
+          USERDATA_DIR="$PROJECT_DIR/xcuserdata"
+          SHARED_DIR="$PROJECT_DIR/xcshareddata/xcschemes"
+
+          # Create the destination directory if it doesn't exist
+          mkdir -p "$SHARED_DIR"
+
+          # Find any .xcscheme files inside the private xcuserdata folder and copy them over
+          if [ -d "$USERDATA_DIR" ]; then
+            find "$USERDATA_DIR" -name "*.xcscheme" -exec cp {} "$SHARED_DIR/" \;
+            echo "Successfully converted private schemes to shared schemes!"
+            ls -la "$SHARED_DIR"
+          else
+            echo "Warning: No xcuserdata folder found to convert."
+          fi
+
+      # Step 4: Run the build with the newly shared scheme
       - name: Build Project
         run: |
           xcodebuild clean build \
             -project "CashappSpoof.xcodeproj" \
             -scheme "CashappSpoof" \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
-            -autocreateSchemes \
-            -allowProvisioningUpdates
+            -destination 'platform=iOS Simulator,name=iPhone 15'
