@@ -1,4 +1,4 @@
-name: Xcode Build and Test
+name: Xcode Build
 
 on:
   push:
@@ -11,17 +11,22 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      # Step 1: Download your repository files onto the GitHub runner
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # Step 2: Set up the latest stable version of Xcode tools
       - name: Set Xcode Version
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: 'latest-stable'
 
+      # Step 3: Automatically generate schemes and compile the app
       - name: Build Project
         run: |
           xcodebuild clean build \
-            -project "CashAppSpoof.xcodeproj" \
-            -scheme "CashAppSpoof" \
-            -destination 'platform=iOS Simulator,name=iPhone 15'
+            -project "CashappSpoof.xcodeproj" \
+            -scheme "CashappSpoof" \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            -autocreateSchemes \
+            -allowProvisioningUpdates
